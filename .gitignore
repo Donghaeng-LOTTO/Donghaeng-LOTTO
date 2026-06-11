@@ -90,9 +90,8 @@ Thumbs.db
 .idea/
 
 # =========================
-# Model / output artifacts
+# output artifacts
 # =========================
-models/
 checkpoints/
 outputs/
 reports/
