@@ -58,7 +58,8 @@ def _make_we_state_key(df: pd.DataFrame) -> pd.Series:
         side_str = side.str[:3].fillna("unk")
     else:
         side_str = side.map({True: "top", False: "bot"}).fillna("unk")
-    diff = _clip_score_diff(pd.to_numeric(df.get("batting_score_diff_before", 0), errors="coerce").fillna(0))
+    _diff_raw = df["batting_score_diff_before"] if "batting_score_diff_before" in df.columns else pd.Series(0, index=df.index)
+    diff = _clip_score_diff(pd.to_numeric(_diff_raw, errors="coerce").fillna(0))
     outs = pd.to_numeric(df["outs_before"], errors="coerce").fillna(0).clip(0, 2).astype(int)
     bases = _norm_base_state(df)
     return (
@@ -165,7 +166,7 @@ def build_re_table(
     if "half_inning_key" in df.columns:
         df["_hi_key"] = df["half_inning_key"].astype(str)
     else:
-        side = df.get("batting_team_side", "unk")
+        side = df["batting_team_side"] if "batting_team_side" in df.columns else pd.Series("unk", index=df.index)
         df["_hi_key"] = (
             df["game_id"].astype(str)
             + "_" + df["inning"].astype(str)

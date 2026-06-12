@@ -180,7 +180,7 @@ def _add_home_advantage_feature(master: pd.DataFrame) -> pd.DataFrame:
             out["is_home_batting"] = out["batting_team_code"].eq(out["home_team_code"])
         else:
             out["is_home_batting"] = False
-    out["is_home_batting"] = out["is_home_batting"].astype(int)
+    out["is_home_batting"] = out["is_home_batting"].fillna(False).astype(bool).astype(int)
     return out
 
 
