@@ -271,6 +271,9 @@ def build_batter_split_stats(
     right_df = records[1].set_index(["game_id", "batter_pcode"])
     result = left_df.join(right_df, how="outer").reset_index()
 
+    # PA 단위 중복 → 경기당 1행으로 dedup (shift(1) 기준 첫 번째 값 = 경기 시작 전 누적값)
+    result = result.groupby(["game_id", "batter_pcode"], as_index=False).first()
+
     logger.info("타자 스플릿 생성: %d행", len(result))
     return result
 
@@ -359,6 +362,9 @@ def build_pitcher_split_stats(
     left_df  = records[0].set_index(["game_id", "pitcher_pcode"])
     right_df = records[1].set_index(["game_id", "pitcher_pcode"])
     result = left_df.join(right_df, how="outer").reset_index()
+
+    # PA 단위 중복 → 경기당 1행으로 dedup
+    result = result.groupby(["game_id", "pitcher_pcode"], as_index=False).first()
 
     logger.info("투수 스플릿 생성: %d행", len(result))
     return result

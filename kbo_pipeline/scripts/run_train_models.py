@@ -157,6 +157,74 @@ def test_whatif_engine() -> None:
     logger.info("  최선 선택: %s", best_result["best"].get("label"))
 
 
+def save_report_md(args, results: dict) -> None:
+    """학습 결과를 models/training_report.md 로 저장."""
+    from datetime import datetime
+    from pathlib import Path
+
+    lines = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    lines += [
+        f"# KBO What-if 모델 학습 리포트",
+        f"",
+        f"**실행 일시**: {now}  ",
+        f"**피처 모드**: {args.feature_mode}  ",
+        f"**타깃 라벨**: {args.label}  ",
+        f"**검증 시즌**: {args.test_seasons or '마지막 2시즌 자동 선택'}  ",
+        f"**사용 피처 수**: {len(results.get('feature_list', []))}개  ",
+        f"",
+        f"---",
+        f"",
+        f"## 모델 성능",
+        f"",
+        f"| 모델 | AUC | Brier | LogLoss |",
+        f"|------|-----|-------|---------|",
+    ]
+
+    if "logistic" in results:
+        m = results["logistic"]["metrics"]
+        lines.append(
+            f"| Logistic | {m.get('auc', 0):.4f} | {m.get('brier', 0):.4f} | {m.get('log_loss', 0):.4f} |"
+        )
+    if "lgbm" in results:
+        m = results["lgbm"]["metrics"]
+        lines.append(
+            f"| LightGBM | {m.get('auc', 0):.4f} | {m.get('brier', 0):.4f} | {m.get('log_loss', 0):.4f} |"
+        )
+
+    if "lgbm" in results:
+        fi = results["lgbm"]["feature_importance"]
+        lines += [
+            f"",
+            f"---",
+            f"",
+            f"## LightGBM 피처 중요도 (gain 기준 Top 20)",
+            f"",
+            f"| 순위 | 피처 | Gain | Split |",
+            f"|------|------|------|-------|",
+        ]
+        for rank, (_, row) in enumerate(fi.head(20).iterrows(), 1):
+            lines.append(
+                f"| {rank} | `{row['feature']}` | {int(row['importance_gain'])} | {int(row.get('importance_split', 0))} |"
+            )
+
+    lines += [
+        f"",
+        f"---",
+        f"",
+        f"## 사용 피처 목록",
+        f"",
+    ]
+    for f in results.get("feature_list", []):
+        lines.append(f"- `{f}`")
+
+    path = Path("models") / "training_report.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+    logger.info("[saved] %s", path)
+
+
 def main() -> None:
     args = parse_args()
 
@@ -199,6 +267,9 @@ def main() -> None:
             logger.info("    %-45s gain=%d", row["feature"], int(row["importance_gain"]))
     logger.info("  사용 피처 수: %d", len(results.get("feature_list", [])))
     logger.info("=" * 60)
+
+    # MD 리포트 저장
+    save_report_md(args, results)
 
     # What-if 엔진 테스트
     if args.test_whatif:

@@ -122,9 +122,14 @@ def time_based_split(
 
     seasons_sorted = sorted(df["season"].dropna().unique())
     if len(seasons_sorted) < 2:
-        logger.warning("시즌 1개 — 80/20 랜덤 분할로 대체")
+        logger.warning("시즌 1개 — game_id 단위 80/20 랜덤 분할로 대체 (PA 단위 분할 시 누수 방지)")
         from sklearn.model_selection import train_test_split
-        train_idx, test_idx = train_test_split(df.index, test_size=0.2, random_state=42)
+        games = df["game_id"].unique()
+        train_games, test_games = train_test_split(games, test_size=0.2, random_state=42)
+        train_idx = df[df["game_id"].isin(train_games)].index
+        test_idx  = df[df["game_id"].isin(test_games)].index
+        logger.info("game_id 분할: 학습 %d경기 (%d행) | 검증 %d경기 (%d행)",
+                    len(train_games), len(train_idx), len(test_games), len(test_idx))
         return train_idx, test_idx
 
     if test_seasons is None:
@@ -403,7 +408,7 @@ def run_training(
         lgbm_params  : LightGBM 파라미터 override.
     """
     feature_list = MVP_FEATURES if feature_mode == "mvp" else ADVANCED_FEATURES
-    use_extended = feature_mode == "advanced"
+    use_extended = True  # extended 파일이 있으면 항상 우선 사용 (WE/RE는 mvp에도 포함)
 
     df = load_training_data(use_extended=use_extended, label_col=label_col)
     X, y = prepare_features(df, feature_list, label_col=label_col, to_float32=True)

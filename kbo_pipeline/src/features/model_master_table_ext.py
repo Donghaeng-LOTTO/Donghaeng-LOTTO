@@ -220,7 +220,15 @@ def run_extended_master_table(
     out_path = Path(output_path) if output_path else config.PROCESSED_DIR / "model_master_pa_extended.csv"
     elig_path = Path(eligible_output_path) if eligible_output_path else config.PROCESSED_DIR / "model_master_pa_extended_eligible.csv"
 
-    master   = build_model_master_table()
+    # 이미 정상적으로 생성된 model_master_pa.csv가 있으면 재사용 (plate_appearances.csv 재파싱 생략)
+    base_path = config.PROCESSED_DIR / "model_master_pa.csv"
+    if base_path.exists():
+        logger.info("기존 model_master_pa.csv 로드: %s", base_path)
+        import pandas as pd
+        master = pd.read_csv(base_path, low_memory=False, encoding="utf-8-sig")
+        logger.info("로드 완료: %d행 x %d열", len(master), len(master.columns))
+    else:
+        master = build_model_master_table()
     extended = build_extended_master_table(master)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
