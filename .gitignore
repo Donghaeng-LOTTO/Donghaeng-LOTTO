@@ -1,108 +1,107 @@
 # =========================
-# Python
+# Node.js & Next.js
 # =========================
-__pycache__/
-*.py[cod]
-*$py.class
+# 프로젝트 내 모든 의존성 및 캐시 폴더 강제 차단 (중요)
+**/node_modules/
+**/.next/
+**/out/
+**/.vercel/
 
-# Virtual environments
+# 프론트엔드 환경 변수 파일
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# 패키지 매니저 로그
+*.log*
+**/npm-debug.log*
+**/yarn-debug.log*
+**/pnpm-debug.log*
+
+# =========================
+# Python & 가상환경
+# =========================
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+
+# 가상환경 폴더 전체 차단 (루트 및 하위 파이프라인 내부 포함)
 .venv/
-venv/
-env/
+**/venv/
+**/env/
 
-# Python build / package
-build/
-dist/
-*.egg-info/
-
-# =========================
-# uv
-# =========================
-# uv.lock은 보통 커밋 추천
-# uv.lock
+# 파이썬 빌드 파일
+**/build/
+**/dist/
+**/*.egg-info/
 
 # =========================
-# Environment variables
+# 환경 변수 및 공통 설정
 # =========================
 .env
 .env.*
 !.env.example
 
 # =========================
-# Data files
+# 데이터 및 크롤링 파일 (경로 고도화)
 # =========================
-*.csv
-*.tsv
-*.xlsx
-*.xls
-*.parquet
-*.pkl
-*.pickle
-*.feather
+**/*.csv
+**/*.tsv
+**/*.xlsx
+**/*.xls
+**/*.parquet
+**/*.pkl
+**/*.pickle
+**/*.feather
 
-# Raw / processed crawled data
-data/raw/
-data/processed/
-data/external/
+# 하위 파이프라인 폴더 내 데이터 저장소 차단
+**/data/raw/
+**/data/processed/
+**/data/external/
 
-# 단, 폴더 구조만 유지하고 싶으면 .gitkeep은 허용
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/external/.gitkeep
-
-# =========================
-# JSON crawl outputs
-# =========================
-raw_*.json
-*.jsonl
-
-*.json
-*.jsonl
-
-!config/*.json
-!package.json
-!package-lock.json
-!tsconfig.json
-
-# 만약 설정용 json은 추적하고 싶으면 예외 추가
-# !config/*.json
-
+# 구조 유지를 위한 파일은 예외 허용
+!**/data/raw/.gitkeep
+!**/data/processed/.gitkeep
+!**/data/external/.gitkeep
 
 # =========================
-# Logs / reports
+# JSON 처리 및 설정 파일 예외
 # =========================
-logs/
-*.log
-*.tmp
+# 데이터용 JSON 위주로 차단하되 설정 파일은 엄격하게 살림
+**/raw_*.json
+**/*.jsonl
+
+# 프로젝트 설정에 필수적인 json 파일들은 무조건 추적
+!**/package.json
+!**/package-lock.json
+!**/tsconfig.json
+!**/pyproject.toml
+!**/config/*.json
 
 # =========================
-# Jupyter
-# =========================
-.ipynb_checkpoints/
-
-# =========================
-# OS / Editor
+# 개발 툴 및 시스템 파일
 # =========================
 .DS_Store
 Thumbs.db
-
-.vscode/
-.idea/
+**/.vscode/
+**/.idea/
+**/.ipynb_checkpoints/
 
 # =========================
-# output artifacts
+# 대용량 분석 결과물 및 모델 가중치
 # =========================
-checkpoints/
-outputs/
-reports/
-artifacts/
+**/checkpoints/
+**/outputs/
+**/reports/
+**/artifacts/
 
-*.joblib
-*.h5
-*.keras
-*.pt
-*.pth
-*.onnx
+**/*.joblib
+**/*.h5
+**/*.keras
+**/*.pt
+**/*.pth
+**/*.onnx
 
-*.pdf
-*.m4a
+**/*.pdf
+**/*.m4a
