@@ -1,6 +1,6 @@
 # KBO What-if 모델 학습 리포트
 
-**실행 일시**: 2026-06-12 15:51:17  
+**실행 일시**: 2026-06-12 17:10:54  
 **피처 모드**: mvp  
 **타깃 라벨**: batting_team_win_label  
 **검증 시즌**: 마지막 2시즌 자동 선택  
@@ -12,8 +12,8 @@
 
 | 모델 | AUC | Brier | LogLoss |
 |------|-----|-------|---------|
-| Logistic | 0.8703 | 0.1461 | 0.4350 |
-| LightGBM | 1.0000 | 0.0002 | 0.0012 |
+| Logistic | 0.9129 | 0.1213 | 0.3670 |
+| LightGBM | 0.8703 | 0.1503 | 0.4598 |
 
 ---
 
@@ -21,26 +21,26 @@
 
 | 순위 | 피처 | Gain | Split |
 |------|------|------|-------|
-| 1 | `batting_score_diff_before` | 4582131 | 1437 |
-| 2 | `pitcher_pre_k9_before` | 1997156 | 1700 |
-| 3 | `pitcher_pre_bb9_before` | 1541288 | 1358 |
-| 4 | `pitcher_pre_whip_before` | 1373061 | 1577 |
-| 5 | `pitcher_pre_era_before` | 1295703 | 1454 |
-| 6 | `pitcher_pre_ip_before` | 1045033 | 1258 |
-| 7 | `batter_pre_games_before` | 699309 | 1264 |
-| 8 | `is_top_bool` | 622626 | 704 |
-| 9 | `batter_pre_obp_approx_before` | 502395 | 1333 |
-| 10 | `pitcher_pre_cum_hr` | 467290 | 346 |
-| 11 | `pitcher_pre_games_before` | 331755 | 639 |
-| 12 | `batter_pre_avg_before` | 328428 | 978 |
-| 13 | `batter_pre_slg_before` | 257964 | 902 |
-| 14 | `batter_pre_ops_before` | 251979 | 1043 |
-| 15 | `batter_pre_cum_ab` | 236142 | 1233 |
-| 16 | `inning` | 199991 | 1241 |
-| 17 | `batter_pre_cum_bb` | 181211 | 529 |
-| 18 | `is_home_batting` | 170899 | 196 |
-| 19 | `batter_pre_cum_kk` | 120834 | 528 |
-| 20 | `state_re` | 71187 | 664 |
+| 1 | `batting_score_diff_before` | 17753 | 181 |
+| 2 | `pitcher_pre_k9_before` | 2766 | 186 |
+| 3 | `pitcher_pre_era_before` | 2651 | 140 |
+| 4 | `pitcher_pre_bb9_before` | 2604 | 140 |
+| 5 | `pitcher_pre_whip_before` | 2224 | 142 |
+| 6 | `pitcher_pre_ip_before` | 1941 | 139 |
+| 7 | `is_top_bool` | 1896 | 56 |
+| 8 | `batter_pre_games_before` | 945 | 75 |
+| 9 | `batter_pre_obp_approx_before` | 650 | 46 |
+| 10 | `is_home_batting` | 620 | 17 |
+| 11 | `batter_pre_ops_before` | 590 | 48 |
+| 12 | `batter_pre_slg_before` | 571 | 45 |
+| 13 | `batter_pre_avg_before` | 551 | 48 |
+| 14 | `pitcher_pre_cum_hr` | 438 | 25 |
+| 15 | `pitcher_pre_games_before` | 390 | 39 |
+| 16 | `batter_pre_cum_ab` | 300 | 32 |
+| 17 | `batter_pre_cum_kk` | 170 | 18 |
+| 18 | `inning` | 164 | 39 |
+| 19 | `batter_pre_cum_bb` | 158 | 29 |
+| 20 | `state_re` | 22 | 9 |
 
 ---
 
