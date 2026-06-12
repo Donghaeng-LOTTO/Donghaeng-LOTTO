@@ -113,9 +113,10 @@ def _rename_non_keys(df: pd.DataFrame, keys: list[str], prefix: str) -> pd.DataF
 
 
 def _side_from_top(is_top: pd.Series) -> pd.Series:
+    is_top_np = is_top.astype(object).eq(True)
     return pd.Series(
         np.select(
-            [is_top.eq(True), is_top.eq(False)],
+            [is_top_np, is_top.astype(object).eq(False)],
             ["away", "home"],
             default=pd.NA,
         ),
@@ -125,9 +126,10 @@ def _side_from_top(is_top: pd.Series) -> pd.Series:
 
 
 def _opposite_side(side: pd.Series) -> pd.Series:
+    side_obj = side.astype(object)
     return pd.Series(
         np.select(
-            [side.eq("away"), side.eq("home")],
+            [side_obj.eq("away"), side_obj.eq("home")],
             ["home", "away"],
             default=pd.NA,
         ),
@@ -284,17 +286,18 @@ def _add_context_features(df: pd.DataFrame) -> pd.DataFrame:
     out["is_home_batting"] = out["batting_team_side"].eq("home")
     out["is_away_batting"] = out["batting_team_side"].eq("away")
 
+    _is_top = out["is_top_bool"].astype(object).eq(True)
     out["batting_score_before"] = np.where(
-        out["is_top_bool"].eq(True), out["away_score_before"], out["home_score_before"]
+        _is_top, out["away_score_before"], out["home_score_before"]
     )
     out["fielding_score_before"] = np.where(
-        out["is_top_bool"].eq(True), out["home_score_before"], out["away_score_before"]
+        _is_top, out["home_score_before"], out["away_score_before"]
     )
     out["batting_score_after"] = np.where(
-        out["is_top_bool"].eq(True), out["away_score_after"], out["home_score_after"]
+        _is_top, out["away_score_after"], out["home_score_after"]
     )
     out["fielding_score_after"] = np.where(
-        out["is_top_bool"].eq(True), out["home_score_after"], out["away_score_after"]
+        _is_top, out["home_score_after"], out["away_score_after"]
     )
 
     out["batting_score_diff_before"] = out["batting_score_before"] - out["fielding_score_before"]
@@ -341,11 +344,11 @@ def _add_context_features(df: pd.DataFrame) -> pd.DataFrame:
 def _add_target_labels(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
-    winner = out.get("winner_team_code", pd.Series(pd.NA, index=out.index)).astype("string")
-    home = out.get("home_team_code", pd.Series(pd.NA, index=out.index)).astype("string")
-    away = out.get("away_team_code", pd.Series(pd.NA, index=out.index)).astype("string")
-    batting = out.get("batting_team_code", pd.Series(pd.NA, index=out.index)).astype("string")
-    fielding = out.get("fielding_team_code", pd.Series(pd.NA, index=out.index)).astype("string")
+    winner = out.get("winner_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
+    home = out.get("home_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
+    away = out.get("away_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
+    batting = out.get("batting_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
+    fielding = out.get("fielding_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
 
     out["is_draw_game"] = winner.eq("DRAW")
 

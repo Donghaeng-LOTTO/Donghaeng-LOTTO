@@ -103,3 +103,6 @@ artifacts/
 *.pt
 *.pth
 *.onnx
+
+*.pdf
+*.m4a
