@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+    --font-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Next.js 백그라운드 기본 세팅 보완 */
+html,
+body {
+    background-color: #020617;
+    /* slate-955 다크모드 배경색 강제 지정 */
+    color: #f8fafc;
+    margin: 0;
+    padding: 0;
+}
