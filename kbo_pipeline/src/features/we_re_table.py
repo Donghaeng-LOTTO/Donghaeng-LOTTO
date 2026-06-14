@@ -11,8 +11,8 @@
     모델 학습 시에는 학습 데이터 시즌만 넘겨 별도 산출 권장.
 
 출력:
-  - processed/we_table.csv  : state_key → we, we_n
-  - processed/re_table.csv  : (outs_before, base_state_before) → re, re_n
+  - processed/we_table.csv  : state_key -> we, we_n
+  - processed/re_table.csv  : (outs_before, base_state_before) -> re, re_n
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
-# 점수차 클리핑 범위. 이 범위 밖은 표본이 희소 → 클리핑 후 통합.
+# 점수차 클리핑 범위. 이 범위 밖은 표본이 희소 -> 클리핑 후 통합.
 SCORE_DIFF_CLIP = 6
 
 
@@ -51,13 +51,32 @@ def _clip_score_diff(s: pd.Series, clip: int = SCORE_DIFF_CLIP) -> pd.Series:
 
 
 def _make_we_state_key(df: pd.DataFrame) -> pd.Series:
-    """WE 룩업 키: 이닝_top/bot_점수차클립_아웃_주자상태."""
+    """WE 룩업 키: 이닝_top/bot_점수차클립_아웃_주자상태.
+
+    side 정규화 (어떤 데이터소스든 "top"/"bot"으로 통일):
+      - plate_appearances : is_top (True=top, False=bot)
+      - master            : batting_team_side ("away"->top, "home"->bot)
+                            또는 is_top_bool (True=top, False=bot)
+    """
     inning = pd.to_numeric(df["inning"], errors="coerce").fillna(9).clip(1, 9).astype(int)
-    side = df.get("batting_team_side", df.get("is_top_bool", pd.Series(True, index=df.index)))
-    if side.dtype == object:
-        side_str = side.str[:3].fillna("unk")
+
+    if "batting_team_side" in df.columns:
+        # master 테이블: "away"->top, "home"->bot
+        side_str = df["batting_team_side"].map({"away": "top", "home": "bot"}).fillna("unk")
+    elif "home_or_away" in df.columns:
+        # plate_appearances: 0=원정(top), 1=홈(bot)
+        # is_top 컬럼은 CSV 파싱 버그로 일부 행에 팀코드가 섞여 있어 신뢰 불가
+        side_str = pd.to_numeric(df["home_or_away"], errors="coerce").fillna(0).astype(int).map({0: "top", 1: "bot"}).fillna("unk")
+    elif "is_top_bool" in df.columns:
+        side_str = df["is_top_bool"].map({True: "top", False: "bot"}).fillna("unk")
+    elif "is_top" in df.columns:
+        s = df["is_top"]
+        if s.dtype == object:
+            s = s.map({"True": True, "False": False, True: True, False: False})
+        side_str = s.astype(bool).map({True: "top", False: "bot"}).fillna("unk")
     else:
-        side_str = side.map({True: "top", False: "bot"}).fillna("unk")
+        side_str = pd.Series("top", index=df.index)
+
     _diff_raw = df["batting_score_diff_before"] if "batting_score_diff_before" in df.columns else pd.Series(0, index=df.index)
     diff = _clip_score_diff(pd.to_numeric(_diff_raw, errors="coerce").fillna(0))
     outs = pd.to_numeric(df["outs_before"], errors="coerce").fillna(0).clip(0, 2).astype(int)
@@ -79,20 +98,21 @@ def build_we_table(
     min_samples: int = 30,
     score_diff_clip: int = SCORE_DIFF_CLIP,
 ) -> pd.DataFrame:
-    """plate_appearances 데이터로 WE 룩업 테이블을 생성한다.
-
-    Args:
-        pa_df: plate_appearances.csv (또는 model_master_pa.csv) 데이터.
-               batting_team_win_label 또는 winner_team_code + batting_team_code 필요.
-        min_samples: 최소 표본 수. 미달 셀은 NaN으로 남긴다.
-        score_diff_clip: 점수차 클리핑 상한(절대값).
-
-    Returns:
-        state_key별 WE, 표본 수 DataFrame.
-    """
+    """plate_appearances 데이터로 WE 룩업 테이블을 생성한다."""
     df = pa_df.copy()
 
-    # 라벨 확보
+    # batting_score_diff_before 파생 (PA 데이터에 없는 경우)
+    if "batting_score_diff_before" not in df.columns:
+        if {"away_score_before", "home_score_before", "home_or_away"}.issubset(df.columns):
+            is_away = pd.to_numeric(df["home_or_away"], errors="coerce").fillna(0).astype(int) == 0
+            batting = pd.to_numeric(
+                df["away_score_before"].where(is_away, df["home_score_before"]), errors="coerce"
+            ).fillna(0)
+            fielding = pd.to_numeric(
+                df["home_score_before"].where(is_away, df["away_score_before"]), errors="coerce"
+            ).fillna(0)
+            df["batting_score_diff_before"] = batting - fielding
+
     if "batting_team_win_label" not in df.columns:
         if {"winner_team_code", "batting_team_code"}.issubset(df.columns):
             df["batting_team_win_label"] = np.where(
@@ -115,11 +135,10 @@ def build_we_table(
         .reset_index()
         .rename(columns={"_we_key": "state_key"})
     )
-    # 최소 표본 미달 셀은 NaN (모델이 fallback 처리)
     agg.loc[agg["we_n"] < min_samples, "we"] = np.nan
 
     logger.info(
-        "WE 테이블 생성: %d 상태, 유효(n≥%d) %d개 (%.1f%%)",
+        "WE 테이블 생성: %d 상태, 유효(n>=% d) %d개 (%.1f%%)",
         len(agg),
         min_samples,
         agg["we"].notna().sum(),
@@ -135,25 +154,12 @@ def build_re_table(
     pa_df: pd.DataFrame,
     min_samples: int = 10,
 ) -> pd.DataFrame:
-    """plate_appearances 데이터로 RE 룩업 테이블을 생성한다.
-
-    각 타석의 '잔여 이닝 득점'을 역방향 누적으로 계산한다.
-    RE(아웃, 주자) = 해당 상태 이후 이닝 종료까지 평균 득점.
-
-    Args:
-        pa_df: plate_appearances.csv. half_inning_key 또는
-               (game_id, inning, batting_team_side)로 반이닝 구분.
-        min_samples: 최소 표본 수.
-
-    Returns:
-        (outs_before, base_state_before) → re, re_n DataFrame.
-    """
+    """plate_appearances 데이터로 RE 룩업 테이블을 생성한다."""
     df = pa_df.copy()
 
     required = {"batting_score_before", "batting_score_after"}
     has_scores = required.issubset(df.columns)
     if not has_scores:
-        # away/home 점수 컬럼으로 대체
         if {"away_score_before", "home_score_before", "is_top"}.issubset(df.columns):
             is_top = df["is_top"].astype(bool)
             df["batting_score_before"] = np.where(is_top, df["away_score_before"], df["home_score_before"])
@@ -162,7 +168,6 @@ def build_re_table(
             logger.warning("RE 계산에 필요한 득점 컬럼 없음. RE 테이블 생성 건너뜀.")
             return pd.DataFrame(columns=["outs_before", "base_state_before", "re", "re_n"])
 
-    # 반이닝 키 구성
     if "half_inning_key" in df.columns:
         df["_hi_key"] = df["half_inning_key"].astype(str)
     else:
@@ -173,25 +178,19 @@ def build_re_table(
             + "_" + side.astype(str)
         )
 
-    # 타석당 득점 = 타석 후 점수 - 타석 전 점수 (음수는 0 처리)
     df["_pa_runs"] = (
         pd.to_numeric(df["batting_score_after"], errors="coerce")
         - pd.to_numeric(df["batting_score_before"], errors="coerce")
     ).clip(lower=0).fillna(0)
 
-    # 반이닝 내 역방향 누적합으로 잔여 득점 계산
-    # sort: relay_no or pa_index_in_half_inning
     sort_col = "pa_index_in_half_inning" if "pa_index_in_half_inning" in df.columns else "relay_no"
     if sort_col not in df.columns:
         df[sort_col] = df.groupby("_hi_key").cumcount()
 
     df = df.sort_values(["_hi_key", sort_col])
 
-    # 이닝 끝까지 총 득점
     hi_total = df.groupby("_hi_key")["_pa_runs"].transform("sum")
-    # 현재 PA까지 누적 득점 (현재 PA 이전)
     hi_cum_before = df.groupby("_hi_key")["_pa_runs"].transform(lambda s: s.cumsum().shift(1).fillna(0))
-    # 잔여 득점 = 총 득점 - 현재까지 누적
     df["_runs_rest"] = hi_total - hi_cum_before
 
     df["_outs"] = pd.to_numeric(df["outs_before"], errors="coerce").fillna(0).clip(0, 2).astype(int)
@@ -206,7 +205,7 @@ def build_re_table(
     agg.loc[agg["re_n"] < min_samples, "re"] = np.nan
 
     logger.info(
-        "RE 테이블 생성: %d 상태, 유효(n≥%d) %d개",
+        "RE 테이블 생성: %d 상태, 유효(n>=%d) %d개",
         len(agg), min_samples, agg["re"].notna().sum(),
     )
     return agg
@@ -219,7 +218,6 @@ def join_we_re(master: pd.DataFrame, we_table: pd.DataFrame, re_table: pd.DataFr
     """마스터 테이블에 WE/RE 컬럼을 조인한다."""
     out = master.copy()
 
-    # WE 조인
     if not we_table.empty and "state_key" in we_table.columns:
         out["_we_key"] = _make_we_state_key(out)
         we_map = we_table.set_index("state_key")[["we", "we_n"]]
@@ -227,11 +225,14 @@ def join_we_re(master: pd.DataFrame, we_table: pd.DataFrame, re_table: pd.DataFr
         out["state_we_n"] = out["_we_key"].map(we_map["we_n"])
         out = out.drop(columns=["_we_key"])
 
-    # RE 조인
     if not re_table.empty:
         outs_col = pd.to_numeric(out["outs_before"], errors="coerce").fillna(0).clip(0, 2).astype(int)
-        bases_col = _norm_base_state(out)
-        re_map = re_table.set_index(["outs_before", "base_state_before"])["re"]
+        bases_col = _norm_base_state(out)  # "000"~"111" 문자열
+        # re_table CSV는 base_state_before를 정수로 저장함(앞자리 0 손실).
+        # "000"->0, "010"->10, "100"->100 이므로 str.zfill(3)으로 복원
+        re_norm = re_table.copy()
+        re_norm["base_state_before"] = re_norm["base_state_before"].astype(str).str.zfill(3)
+        re_map = re_norm.set_index(["outs_before", "base_state_before"])["re"]
         out["state_re"] = list(zip(outs_col, bases_col))
         out["state_re"] = out["state_re"].map(re_map)
 
@@ -243,18 +244,10 @@ def join_we_re(master: pd.DataFrame, we_table: pd.DataFrame, re_table: pd.DataFr
 # ---------------------------------------------------------------------------
 def run_we_re_tables(
     train_seasons: list[int] | None = None,
-    min_we_samples: int = 30,
+    min_we_samples: int = 10,  # 30->10: 163837 상태 공간에서 30은 유효율 1%로 너무 엄격
     min_re_samples: int = 10,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """WE/RE 테이블을 산출하고 processed/에 저장한다.
-
-    Args:
-        train_seasons: 룩업 계산에 사용할 시즌 목록.
-                       None이면 전체 데이터 사용 (EDA/MVP 단계).
-                       실제 모델 학습 시에는 학습 시즌만 지정할 것.
-        min_we_samples: WE 최소 표본 수.
-        min_re_samples: RE 최소 표본 수.
-    """
+    """WE/RE 테이블을 산출하고 processed/에 저장한다."""
     pa_path = config.PROCESSED_DIR / "plate_appearances.csv"
     if not pa_path.exists():
         logger.error("plate_appearances.csv 없음: %s", pa_path)
@@ -268,7 +261,7 @@ def run_we_re_tables(
                 pa["game_id"].astype(str).str[:4].pipe(pd.to_numeric, errors="coerce")
             )
         pa = pa[pa["season"].isin(train_seasons)].copy()
-        logger.info("학습 시즌 필터: %s → %d행", train_seasons, len(pa))
+        logger.info("학습 시즌 필터: %s -> %d행", train_seasons, len(pa))
 
     we = build_we_table(pa, min_samples=min_we_samples)
     re = build_re_table(pa, min_samples=min_re_samples)

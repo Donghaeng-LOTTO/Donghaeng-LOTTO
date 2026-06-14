@@ -229,6 +229,8 @@ def _merge_batter_pre_stats(pa: pd.DataFrame, batter_pre: pd.DataFrame) -> pd.Da
     bp = bp.drop(columns=["player_code", "team_code"], errors="ignore")
     keys = ["game_id", "batter_pcode_norm", "batting_team_code"]
     bp = _rename_non_keys(bp, keys=keys, prefix="batter_pre")
+    # join key 중복 제거 (중복 있으면 left join에서 행 폭발)
+    bp = bp.drop_duplicates(subset=keys, keep="last")
 
     out = pa.merge(bp, on=keys, how="left")
     out["has_batter_pre_stats"] = out.get("batter_pre_games_before", pd.Series(np.nan, index=out.index)).notna()
@@ -249,6 +251,8 @@ def _merge_pitcher_pre_stats(pa: pd.DataFrame, pitcher_pre: pd.DataFrame) -> pd.
     pp = pp.drop(columns=["pcode", "team_code"], errors="ignore")
     keys = ["game_id", "pitcher_pcode_norm", "fielding_team_code"]
     pp = _rename_non_keys(pp, keys=keys, prefix="pitcher_pre")
+    # join key 중복 제거
+    pp = pp.drop_duplicates(subset=keys, keep="last")
 
     out = pa.merge(pp, on=keys, how="left")
     out["has_pitcher_pre_stats"] = out.get("pitcher_pre_games_before", pd.Series(np.nan, index=out.index)).notna()
@@ -344,31 +348,35 @@ def _add_context_features(df: pd.DataFrame) -> pd.DataFrame:
 def _add_target_labels(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
-    winner = out.get("winner_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
-    home = out.get("home_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
-    away = out.get("away_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
-    batting = out.get("batting_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
-    fielding = out.get("fielding_team_code", pd.Series(pd.NA, index=out.index)).astype("string").astype(object)
+    def _norm_team(series):
+        """팀코드를 str로 정규화. NA/nan -> "" (np.select boolean 평가 오류 방지)"""
+        return series.fillna("").astype(str).replace("nan", "")
+
+    winner = _norm_team(out.get("winner_team_code", pd.Series("", index=out.index)))
+    home = _norm_team(out.get("home_team_code", pd.Series("", index=out.index)))
+    away = _norm_team(out.get("away_team_code", pd.Series("", index=out.index)))
+    batting = _norm_team(out.get("batting_team_code", pd.Series("", index=out.index)))
+    fielding = _norm_team(out.get("fielding_team_code", pd.Series("", index=out.index)))
 
     out["is_draw_game"] = winner.eq("DRAW")
 
     out["home_win_label"] = np.select(
-        [winner.eq(home), winner.eq("DRAW"), winner.isna()],
+        [winner.eq(home) & ~winner.eq(""), winner.eq("DRAW"), winner.eq("")],
         [1.0, 0.5, np.nan],
         default=0.0,
     )
     out["away_win_label"] = np.select(
-        [winner.eq(away), winner.eq("DRAW"), winner.isna()],
+        [winner.eq(away) & ~winner.eq(""), winner.eq("DRAW"), winner.eq("")],
         [1.0, 0.5, np.nan],
         default=0.0,
     )
     out["batting_team_win_label"] = np.select(
-        [winner.eq(batting), winner.eq("DRAW"), winner.isna()],
+        [winner.eq(batting) & ~winner.eq(""), winner.eq("DRAW"), winner.eq("")],
         [1.0, 0.5, np.nan],
         default=0.0,
     )
     out["fielding_team_win_label"] = np.select(
-        [winner.eq(fielding), winner.eq("DRAW"), winner.isna()],
+        [winner.eq(fielding) & ~winner.eq(""), winner.eq("DRAW"), winner.eq("")],
         [1.0, 0.5, np.nan],
         default=0.0,
     )
