@@ -5,10 +5,88 @@ import plotly.express as px
 import plotly.graph_objects as objects
 import json
 import time
+from pathlib import Path
 from streamlit_option_menu import option_menu
 from streamlit_modal import Modal
 import streamlit.components.v1 as components
 import base64
+
+# ── 데이터 경로
+DATA_DIR = Path(__file__).parent / "kbo_pipeline" / "data" / "processed"
+MODELS_DIR = Path(__file__).parent / "kbo_pipeline" / "models"
+
+@st.cache_data(show_spinner=False)
+def load_real_data():
+    """실제 롯데 경기/타자 데이터 로드"""
+    # 게임 데이터
+    games = pd.read_csv(DATA_DIR / "games.csv", low_memory=False)
+    games["year"] = games["game_date"].astype(str).str[:4]
+    games = games[games["status_code"].astype(str).isin(["4", "RESULT"])]
+    games = games[~games["cancel_flag"].astype(str).isin(["True", "Y", "1"])]
+    lt = games[(games["away_team_code"] == "LT") | (games["home_team_code"] == "LT")].copy()
+
+    # 연도별 홈/원정 승률 (2015~2025)
+    wr_rows = []
+    for year in [str(y) for y in range(2015, 2026)]:
+        g = lt[lt["year"] == year]
+        home = g[g["home_team_code"] == "LT"]
+        away = g[g["away_team_code"] == "LT"]
+        home_nodraw = home[home["home_score"] != home["away_score"]]
+        away_nodraw = away[away["away_score"] != away["home_score"]]
+        hw = (home_nodraw["home_score"] > home_nodraw["away_score"]).sum() / max(len(home_nodraw), 1)
+        aw = (away_nodraw["away_score"] > away_nodraw["home_score"]).sum() / max(len(away_nodraw), 1)
+        if len(home_nodraw) + len(away_nodraw) > 0:
+            wr_rows.append({"Year": year, "Win Rate": round(hw, 3), "Location": "홈"})
+            wr_rows.append({"Year": year, "Win Rate": round(aw, 3), "Location": "원정"})
+    df_trend = pd.DataFrame(wr_rows)
+
+    # 2024 롯데 타자 OPS 군집 (실제 선수)
+    pa_cols = ["batter_name", "batter_pre_avg_before", "batter_pre_ops_before",
+               "batter_pre_cum_hr", "batter_pre_cum_kk", "batter_pre_cum_ab",
+               "game_date", "is_lotte_batting", "lotte_win_label"]
+    pa = pd.read_csv(DATA_DIR / "model_master_pa_eligible.csv", low_memory=False, usecols=pa_cols)
+    pa["year"] = pa["game_date"].astype(str).str[:4]
+
+    # EDA 차트1: 롯데 타석 OPS 분포 (승/패별)
+    lotte_pa = pa[(pa["year"] >= "2022") & (pa["is_lotte_batting"] == True) & pa["lotte_win_label"].notna()]
+    lotte_pa = lotte_pa[lotte_pa["batter_pre_ops_before"].notna() & (lotte_pa["batter_pre_ops_before"] > 0.3)]
+    df_ops = lotte_pa[["batter_pre_ops_before", "lotte_win_label"]].copy()
+    df_ops["Match Result"] = df_ops["lotte_win_label"].map({1.0: "승리", 0.0: "패배"})
+    df_ops = df_ops.rename(columns={"batter_pre_ops_before": "OPS"})
+
+    # EDA 차트3: 2024 롯데 타자 군집
+    pa24 = pa[(pa["year"] == "2024") & (pa["is_lotte_batting"] == True)]
+    batter = pa24.groupby("batter_name").last().reset_index()
+    batter = batter[
+        batter["batter_pre_avg_before"].notna() &
+        batter["batter_pre_ops_before"].notna() &
+        (batter["batter_pre_ops_before"] > 0.3) &
+        (batter["batter_pre_cum_ab"] >= 30)
+    ].copy()
+    batter["K%"] = (batter["batter_pre_cum_kk"] / batter["batter_pre_cum_ab"].clip(1) * 100).round(1)
+    # 군집 분류 (OPS 기준)
+    def classify(ops):
+        if ops >= 0.850: return "핵심 타자 (OPS 0.850+)"
+        elif ops >= 0.730: return "주전 레귤러 (OPS 0.730+)"
+        else: return "서포트 뎁스 (OPS 0.730↓)"
+    batter["Cluster"] = batter["batter_pre_ops_before"].apply(classify)
+
+    return df_ops, df_trend, batter
+
+
+@st.cache_data(show_spinner=False)
+def load_model_metrics():
+    path = MODELS_DIR / "evaluation_report.json"
+    with open(path, encoding="utf-8") as f:
+        report = json.load(f)
+    lgbm = report["lgbm_metrics"]
+    return {
+        "auc":      round(lgbm["auc"] * 100, 1),
+        "brier":    round((1 - lgbm["brier"]) * 100, 1),   # 낮을수록 좋으므로 역변환
+        "n_train":  report["n_train"],
+        "n_test":   report["n_test"],
+        "n_features": report["n_features"],
+    }
 
 # 페이지 기본 설정
 st.set_page_config(
@@ -392,7 +470,7 @@ with col_a:
         use_container_width=True
     ):
         st.switch_page(
-            "pages/01_Model_Analysis.py"
+            "pages/02_WhatIf_Analysis.py"
         )
 
 with col_b:
@@ -420,6 +498,7 @@ try:
         glb_base64 = base64.b64encode(glb_bytes).decode("utf-8")
     glb_data_url = f"data:application/octet-stream;base64,{glb_base64}"
 except FileNotFoundError:
+    glb_base64 = None
     glb_data_url = None
     st.error(
         "baseball.glb 파일을 찾을 수 없습니다. app.py와 같은 폴더에 있는지 확인해주세요."
@@ -690,22 +769,22 @@ st.markdown(
 
 with metric_col1:
     st.markdown(
-        "<div class='metric-card'><div class='metric-value'>12</div><div class='metric-label'>Dataset Count</div><div class='metric-sub'>다차원 정합 소스 테이블 개수</div></div>",
+        "<div class='metric-card'><div class='metric-value'>19</div><div class='metric-label'>Dataset Count</div><div class='metric-sub'>전처리 완료 소스 테이블 수</div></div>",
         unsafe_allow_html=True,
     )
 with metric_col2:
     st.markdown(
-        "<div class='metric-card'><div class='metric-value'>2021-2025</div><div class='metric-label'>Collection Period</div><div class='metric-sub'>최근 5개 시즈널 프레임</div></div>",
+        "<div class='metric-card'><div class='metric-value'>2008~2025</div><div class='metric-label'>Collection Period</div><div class='metric-sub'>KBO 전 시즌 데이터</div></div>",
         unsafe_allow_html=True,
     )
 with metric_col3:
     st.markdown(
-        "<div class='metric-card'><div class='metric-value'>1,452,890</div><div class='metric-label'>Total Records</div><div class='metric-sub'>전수 인스턴스 규모</div></div>",
+        "<div class='metric-card'><div class='metric-value'>649,419</div><div class='metric-label'>Total PA Records</div><div class='metric-sub'>타석 단위 분석 인스턴스</div></div>",
         unsafe_allow_html=True,
     )
 with metric_col4:
     st.markdown(
-        "<div class='metric-card'><div class='metric-value'>78</div><div class='metric-label'>Feature Count</div><div class='metric-sub'>인코딩 타겟 속성수</div></div>",
+        "<div class='metric-card'><div class='metric-value'>31</div><div class='metric-label'>Model Features</div><div class='metric-sub'>승리확률 예측 모델 피처</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -737,62 +816,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 다차원 데이터셋 절차적 시뮬레이션 생성
-np.random.seed(42)
-
-# 차트 1: 경기 승패별 OPS 분포
-win_ops = np.random.normal(loc=0.840, scale=0.08, size=200)
-loss_ops = np.random.normal(loc=0.680, scale=0.09, size=200)
-df_ops = pd.DataFrame(
-    {
-        "OPS": np.concatenate([win_ops, loss_ops]),
-        "Match Result": ["Victory"] * 200 + ["Defeat"] * 200,
-    }
-)
-
-# 차트 2: 홈/원정 승률 변화 추이 타임라인
-years = ["2021", "2022", "2023", "2024", "2025"]
-home_wr = [0.46, 0.49, 0.52, 0.55, 0.58]
-away_wr = [0.42, 0.44, 0.41, 0.48, 0.51]
-df_trend = pd.DataFrame(
-    {
-        "Year": years * 2,
-        "Win Rate": home_wr + away_wr,
-        "Location": ["Home"] * 5 + ["Away"] * 5,
-    }
-)
-
-# 차트 3: 선수단 타격 지표 군집 분석 3D 좌표 스펙
-cluster_size = 50
-df_cluster = pd.DataFrame(
-    {
-        "Batting Average": np.concatenate(
-            [
-                np.random.normal(0.290, 0.02, cluster_size),
-                np.random.normal(0.240, 0.015, cluster_size),
-                np.random.normal(0.265, 0.02, cluster_size),
-            ]
-        ),
-        "Home Runs": np.concatenate(
-            [
-                np.random.normal(25, 5, cluster_size),
-                np.random.normal(8, 3, cluster_size),
-                np.random.normal(15, 4, cluster_size),
-            ]
-        ),
-        "RBI": np.concatenate(
-            [
-                np.random.normal(85, 10, cluster_size),
-                np.random.normal(35, 8, cluster_size),
-                np.random.normal(60, 12, cluster_size),
-            ]
-        ),
-        "Cluster": ["Ops Monster (A)"] * cluster_size
-        + ["Speed/Defense (B)"] * cluster_size
-        + ["Solid Regular (C)"] * cluster_size,
-        "Player": [f"선수_{i}" for i in range(cluster_size * 3)],
-    }
-)
+# ── 실제 데이터 로드
+df_ops, df_trend, df_cluster = load_real_data()
 
 # 3단 컬럼 배치 및 모달 연동 선언
 eda_col1, eda_col2, eda_col3 = st.columns(3)
@@ -803,7 +828,7 @@ modal_eda3 = Modal("Player Cluster 3D Analysis Details", key="m_eda3", max_width
 
 with eda_col1:
     st.markdown(
-        "<h4 style='text-align:center; color:#111827;'>경기 결과별 팀 OPS 분포</h4>",
+        "<h4 style='text-align:center; color:#111827;'>롯데 타자 OPS 분포 (승/패별, 2022~)</h4>",
         unsafe_allow_html=True,
     )
     fig1 = px.histogram(
@@ -811,7 +836,7 @@ with eda_col1:
         x="OPS",
         color="Match Result",
         marginal="box",
-        color_discrete_map={"Victory": "#E31937", "Defeat": "#1E3A8A"},
+        color_discrete_map={"승리": "#E31937", "패배": "#1E3A8A"},
         barmode="overlay",
         opacity=0.75,
     )
@@ -821,16 +846,14 @@ with eda_col1:
         plot_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    fig1.update_yaxes(
-        showgrid=True, gridcolor="#F3F4F6", showline=True, linecolor="#E5E7EB"
-    )
-    st.plotly_chart(fig1, width="stretch")  # Deprecation 수정 완료
+    fig1.update_yaxes(showgrid=True, gridcolor="#F3F4F6", showline=True, linecolor="#E5E7EB")
+    st.plotly_chart(fig1, width="stretch")
     if st.button("OPS 분석 상세보기", key="btn_eda1"):
         modal_eda1.open()
 
 with eda_col2:
     st.markdown(
-        "<h4 style='text-align:center; color:#111827;'>연도별 홈/원정 승률 추이</h4>",
+        "<h4 style='text-align:center; color:#111827;'>롯데 연도별 홈/원정 승률 (2015~2025)</h4>",
         unsafe_allow_html=True,
     )
     fig2 = px.line(
@@ -838,85 +861,101 @@ with eda_col2:
         x="Year",
         y="Win Rate",
         color="Location",
-        color_discrete_map={"Home": "#E31937", "Away": "#6B7280"},
+        color_discrete_map={"홈": "#E31937", "원정": "#6B7280"},
         markers=True,
     )
     fig2.update_layout(
         margin=dict(l=20, r=20, t=20, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        yaxis=dict(tickformat=".0%"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    fig2.update_yaxes(
-        showgrid=True, gridcolor="#F3F4F6", showline=True, linecolor="#E5E7EB"
-    )
-    st.plotly_chart(fig2, width="stretch")  # Deprecation 수정 완료
+    fig2.update_yaxes(showgrid=True, gridcolor="#F3F4F6", showline=True, linecolor="#E5E7EB")
+    st.plotly_chart(fig2, width="stretch")
     if st.button("승률 추이 상세보기", key="btn_eda2"):
         modal_eda2.open()
 
 with eda_col3:
     st.markdown(
-        "<h4 style='text-align:center; color:#111827;'>선수단 군집 분석 (3D 스캐터)</h4>",
+        "<h4 style='text-align:center; color:#111827;'>2024 롯데 타자 OPS·홈런·삼진 군집</h4>",
         unsafe_allow_html=True,
     )
     fig3 = px.scatter_3d(
         df_cluster,
-        x="Batting Average",
-        y="Home Runs",
-        z="RBI",
+        x="batter_pre_avg_before",
+        y="batter_pre_cum_hr",
+        z="K%",
         color="Cluster",
-        hover_name="Player",
+        hover_name="batter_name",
+        hover_data={"batter_pre_ops_before": ":.3f"},
+        labels={
+            "batter_pre_avg_before": "타율",
+            "batter_pre_cum_hr": "홈런",
+            "K%": "삼진율(%)",
+        },
         color_discrete_map={
-            "Ops Monster (A)": "#E31937",
-            "Speed/Defense (B)": "#1E3A8A",
-            "Solid Regular (C)": "#10B981",
+            "핵심 타자 (OPS 0.850+)": "#E31937",
+            "주전 레귤러 (OPS 0.730+)": "#1E3A8A",
+            "서포트 뎁스 (OPS 0.730↓)": "#10B981",
         },
     )
     fig3.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         scene=dict(
-            xaxis=dict(
-                backgroundcolor="rgba(0,0,0,0)",
-                gridcolor="#E5E7EB",
-                showbackground=False,
-            ),
-            yaxis=dict(
-                backgroundcolor="rgba(0,0,0,0)",
-                gridcolor="#E5E7EB",
-                showbackground=False,
-            ),
-            zaxis=dict(
-                backgroundcolor="rgba(0,0,0,0)",
-                gridcolor="#E5E7EB",
-                showbackground=False,
-            ),
+            xaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E7EB", showbackground=False),
+            yaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E7EB", showbackground=False),
+            zaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#E5E7EB", showbackground=False),
         ),
         legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5),
     )
-    st.plotly_chart(fig3, width="stretch")  # Deprecation 수정 완료
+    st.plotly_chart(fig3, width="stretch")
     if st.button("군집 분석 상세보기", key="btn_eda3"):
         modal_eda3.open()
 
 # 모달 컨텐츠 정의 구역
 if modal_eda1.is_open():
     with modal_eda1.container():
+        win_med  = df_ops[df_ops["Match Result"]=="승리"]["OPS"].median()
+        lose_med = df_ops[df_ops["Match Result"]=="패배"]["OPS"].median()
         st.markdown(
-            "<div style='padding:20px;'><h3 style='color:#E31937;'>OPS 분포 세부 인사이트</h3><p>승리 경기의 팀 OPS 중앙값은 0.840선에 형성되며, 패배 경기(0.680)와 명확한 통계적 유의차를 보입니다. 즉, 승리를 보장하기 위한 최소 임계 임팩트 타격 지표는 경기당 OPS 0.800 빌드업입니다.</p></div>",
+            f"<div style='padding:20px;'>"
+            f"<h3 style='color:#E31937;'>OPS 분포 세부 인사이트 (2022~2024 실제 데이터)</h3>"
+            f"<p>✅ <b>승리 타석</b> 중앙 OPS: <b>{win_med:.3f}</b><br>"
+            f"❌ <b>패배 타석</b> 중앙 OPS: <b>{lose_med:.3f}</b><br><br>"
+            f"두 분포 간 중앙값 차이는 <b>{win_med - lose_med:.3f}</b>로, "
+            f"OPS 0.750 이상 타석에서 승리 기여도가 현저히 높게 나타납니다. "
+            f"득점권 클러치 타격력 강화가 핵심 과제입니다.</p></div>",
             unsafe_allow_html=True,
         )
 
 if modal_eda2.is_open():
     with modal_eda2.container():
+        best_home = df_trend[df_trend["Location"]=="홈"].sort_values("Win Rate", ascending=False).iloc[0]
+        worst_away = df_trend[df_trend["Location"]=="원정"].sort_values("Win Rate").iloc[0]
         st.markdown(
-            "<div style='padding:20px;'><h3 style='color:#E31937;'>홈/원정 승률 추이 세부 인사이트</h3><p>2024년 구장 환경 개보수 이후 홈 승률이 58%까지 급격하게 우상향하는 팩터를 가시화합니다. 사직 야구장 파크 팩터의 변화가 투수진의 피안타율 감소에 직접적인 영향을 준 것으로 분석됩니다.</p></div>",
+            f"<div style='padding:20px;'>"
+            f"<h3 style='color:#E31937;'>홈/원정 승률 추이 (2015~2025 실제 데이터)</h3>"
+            f"<p>🏟️ <b>홈 최고 승률</b>: {best_home['Year']}년 <b>{best_home['Win Rate']:.1%}</b><br>"
+            f"✈️ <b>원정 최저 승률</b>: {worst_away['Year']}년 <b>{worst_away['Win Rate']:.1%}</b><br><br>"
+            f"2017년 홈 62.8%로 정점을 찍은 이후 등락을 반복 중입니다. "
+            f"원정 승률은 전반적으로 홈 대비 약 7~10%p 낮아, "
+            f"원정 선발 투수 운용 전략 보강이 필요합니다.</p></div>",
             unsafe_allow_html=True,
         )
 
 if modal_eda3.is_open():
     with modal_eda3.container():
+        top = df_cluster[df_cluster["Cluster"]=="핵심 타자 (OPS 0.850+)"]["batter_name"].tolist()
         st.markdown(
-            "<div style='padding:20px;'><h3 style='color:#E31937;'>3D 클러스터 분석 세부 인사이트</h3><p>타율, 홈런, 타점을 축으로 군집화한 결과 구단의 뎁스가 3개 핵심 세그먼트로 빌드됩니다. 붉은색 군집(Ops Monster)의 생산력을 유지하면서 초록색 regular 군집의 상향 마이그레이션 전략이 요구됩니다.</p></div>",
+            f"<div style='padding:20px;'>"
+            f"<h3 style='color:#E31937;'>2024 롯데 타자 군집 세부 인사이트</h3>"
+            f"<p>🔴 <b>핵심 타자</b> (OPS 0.850+): {', '.join(top) if top else '없음'}<br>"
+            f"🔵 <b>주전 레귤러</b>: OPS 0.730~0.849 타자<br>"
+            f"🟢 <b>서포트 뎁스</b>: OPS 0.730 미만<br><br>"
+            f"타율-홈런-삼진율 3축으로 보면 고OPS 타자들은 삼진율이 높은 경향이 있습니다. "
+            f"콘택트 능력과 장타력의 균형을 유지하는 타자 육성 전략이 요구됩니다.</p></div>",
             unsafe_allow_html=True,
         )
 
@@ -955,49 +994,37 @@ def create_metric_gauge(title, value):
     return fig
 
 
+# 실제 모델 평가 지표 로드
+_m = load_model_metrics()
+
 # 게이지 표시
 with gauge_col1:
-    st.plotly_chart(create_metric_gauge("Accuracy", 88), use_container_width=True)
+    st.plotly_chart(create_metric_gauge(f"AUC-ROC\n(LightGBM)", _m["auc"]), use_container_width=True)
 with gauge_col2:
-    st.plotly_chart(create_metric_gauge("Precision", 92), use_container_width=True)
+    st.plotly_chart(create_metric_gauge("Calibration\n(1-Brier×100)", _m["brier"]), use_container_width=True)
 with gauge_col3:
-    st.plotly_chart(create_metric_gauge("Recall", 85), use_container_width=True)
+    st.plotly_chart(create_metric_gauge("Train Samples\n(×1,000)", round(_m["n_train"]/1000, 1)), use_container_width=True)
 with gauge_col4:
-    st.plotly_chart(create_metric_gauge("F1-Score", 89), use_container_width=True)
+    st.plotly_chart(create_metric_gauge("Model Features", _m["n_features"]), use_container_width=True)
 
-# 페이지 하단 시연 페이지 이동 버튼 (발표 흐름의 끝)
+# 실제 지표 수치 요약
+st.markdown(f"""
+<div style="background:#F9FAFB;border-radius:12px;padding:16px 24px;margin-top:8px;border:1px solid #E5E7EB;
+            display:flex;gap:40px;flex-wrap:wrap;">
+  <div><span style="color:#6B7280;font-size:0.85rem">모델</span><br><b>LightGBM</b></div>
+  <div><span style="color:#6B7280;font-size:0.85rem">AUC</span><br><b style="color:#E31937">{_m['auc']}%</b></div>
+  <div><span style="color:#6B7280;font-size:0.85rem">학습 타석</span><br><b>{_m['n_train']:,}개</b></div>
+  <div><span style="color:#6B7280;font-size:0.85rem">검증 타석</span><br><b>{_m['n_test']:,}개</b></div>
+  <div><span style="color:#6B7280;font-size:0.85rem">피처 수</span><br><b>{_m['n_features']}개</b></div>
+  <div><span style="color:#6B7280;font-size:0.85rem">라벨</span><br><b>타석팀 최종 승리</b></div>
+</div>
+""", unsafe_allow_html=True)
+
+# 페이지 하단 시연 페이지 이동 버튼
 st.divider()
-st.markdown("<div style='text-align: center; padding: 20px;'>", unsafe_allow_html=True)
-st.markdown(
-    """
-    <div style="
-        text-align:center;
-        padding:60px 20px;
-        background:#FFFFFF;
-        border-radius:24px;
-        border:1px solid #E5E7EB;
-        margin-top:50px;
-        margin-bottom:50px;
-    ">
-        <h2 style="color:#111827;">
-            준비되셨나요?
-        </h2>
-
-        <p style="
-            color:#6B7280;
-            font-size:18px;
-            margin-bottom:30px;
-        ">
-            실제 롯데 자이언츠 선수 데이터 분석 페이지로 이동하여<br>
-            시즌별 기록 및 다양한 통계 지표를 확인해보세요.
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown("<div style='text-align:center;padding:60px 20px;background:#FFFFFF;border-radius:24px;border:1px solid #E5E7EB;margin-top:50px;margin-bottom:50px;'><h2 style='color:#111827;'>준비되셨나요?</h2><p style='color:#6B7280;font-size:18px;margin-bottom:30px;'>경기 분기점 What-If 시뮬레이션 페이지로 이동합니다.</p></div>", unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 2, 1])
-
 with col2:
-    if st.button("🚀 시연 페이지 시작하기", use_container_width=True, type="primary"):
-        st.switch_page("pages/01_Model_Analysis.py")
+    if st.button("🚀 경기 IF 분석 시작하기", use_container_width=True, type="primary"):
+        st.switch_page("pages/02_WhatIf_Analysis.py")
