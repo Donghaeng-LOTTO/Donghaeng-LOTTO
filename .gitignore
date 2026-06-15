@@ -56,14 +56,30 @@
 **/*.feather
 
 # 하위 파이프라인 폴더 내 데이터 저장소 차단
-**/data/raw/
-**/data/processed/
-**/data/external/
+# **/data/raw/
+# **/data/processed/
+# **/data/external/
+
+# data 폴더 안의 실제 파일들은 기본적으로 차단
+**/data/raw/**
+**/data/processed/**
+**/data/external/**
+
+# 단, 폴더 구조 탐색은 허용
+!**/data/raw/**/
+!**/data/processed/**/
+!**/data/external/**/
 
 # 구조 유지를 위한 파일은 예외 허용
-!**/data/raw/.gitkeep
+# !**/data/raw/.gitkeep
+# !**/data/processed/.gitkeep
+# !**/data/external/.gitkeep
+
 !**/data/processed/.gitkeep
-!**/data/external/.gitkeep
+!**/data/raw/naver_record/.gitkeep
+!**/data/raw/naver_relay/.gitkeep
+!**/data/raw/naver_schedule/.gitkeep
+!**/data/external/kaggle/.gitkeep
 
 # =========================
 # JSON 처리 및 설정 파일 예외
