@@ -122,9 +122,14 @@ def time_based_split(
 
     seasons_sorted = sorted(df["season"].dropna().unique())
     if len(seasons_sorted) < 2:
-        logger.warning("시즌 1개 — 80/20 랜덤 분할로 대체")
+        logger.warning("시즌 1개 — game_id 단위 80/20 랜덤 분할로 대체 (PA 단위 분할 시 누수 방지)")
         from sklearn.model_selection import train_test_split
-        train_idx, test_idx = train_test_split(df.index, test_size=0.2, random_state=42)
+        games = df["game_id"].unique()
+        train_games, test_games = train_test_split(games, test_size=0.2, random_state=42)
+        train_idx = df[df["game_id"].isin(train_games)].index
+        test_idx  = df[df["game_id"].isin(test_games)].index
+        logger.info("game_id 분할: 학습 %d경기 (%d행) | 검증 %d경기 (%d행)",
+                    len(train_games), len(train_idx), len(test_games), len(test_idx))
         return train_idx, test_idx
 
     if test_seasons is None:
@@ -176,18 +181,16 @@ def build_logistic_pipeline(n_samples: int):
             loss="log_loss",
             penalty="l2",
             alpha=1e-4,
-            max_iter=100,
+            max_iter=200,
             tol=1e-3,
-            n_jobs=-1,
             random_state=42,
             class_weight="balanced",
         )
     else:
         clf = LogisticRegression(
             solver="saga",      # ← lbfgs 대신 saga: 대규모 데이터에 적합
-            max_iter=300,
+            max_iter=1000,
             C=1.0,
-            n_jobs=-1,
             random_state=42,
         )
 
@@ -213,7 +216,7 @@ def train_logistic(
     베이스라인으로 LightGBM 대비 성능 기준선 제공.
     """
     pipe = build_logistic_pipeline(n_samples=len(X_train))
-    pipe.fit(X_train, y_train)
+    pipe.fit(X_train, y_train.astype(int))
 
     if hasattr(pipe.named_steps["clf"], "predict_proba"):
         proba = pipe.predict_proba(X_test)[:, 1]
@@ -222,7 +225,7 @@ def train_logistic(
         from scipy.special import expit
         proba = expit(pipe.decision_function(X_test))
 
-    metrics = _compute_metrics(y_test, proba, model_name="Logistic/SGD")
+    metrics = _compute_metrics(y_test.astype(int), proba, model_name="Logistic/SGD")
     logger.info("Logistic 평가: AUC=%.4f  Brier=%.4f", metrics.get("auc", 0), metrics.get("brier", 0))
     return {"model": pipe, "metrics": metrics, "proba_test": proba}
 
@@ -403,7 +406,7 @@ def run_training(
         lgbm_params  : LightGBM 파라미터 override.
     """
     feature_list = MVP_FEATURES if feature_mode == "mvp" else ADVANCED_FEATURES
-    use_extended = feature_mode == "advanced"
+    use_extended = True  # extended 파일이 있으면 항상 우선 사용 (WE/RE는 mvp에도 포함)
 
     df = load_training_data(use_extended=use_extended, label_col=label_col)
     X, y = prepare_features(df, feature_list, label_col=label_col, to_float32=True)
@@ -412,9 +415,16 @@ def run_training(
     X_train, X_test = X.loc[train_idx].copy(), X.loc[test_idx].copy()
     y_train, y_test = y.loc[train_idx],         y.loc[test_idx]
 
+    # 학습셋 기준 전체 NaN 열 제거 (imputer 경고 방지)
+    all_nan_cols = X_train.columns[X_train.isna().all()].tolist()
+    if all_nan_cols:
+        logger.warning("학습셋 전체 NaN 피처 제거: %s", all_nan_cols)
+        X_train = X_train.drop(columns=all_nan_cols)
+        X_test  = X_test.drop(columns=all_nan_cols)
+
     logger.info(
         "학습셋: %d행  검증셋: %d행  피처: %d개  메모리(float32): %.0fMB",
-        len(X_train), len(X_test), len(X.columns),
+        len(X_train), len(X_test), len(X_train.columns),
         X_train.memory_usage(deep=True).sum() / 1e6,
     )
 

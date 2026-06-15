@@ -1,0 +1,68 @@
+{
+  "situation": {
+    "inning": 7,
+    "is_top_bool": 0,
+    "outs_before": 1,
+    "batting_score_diff_before": -1,
+    "runners_on_before": 1,
+    "base1_before": 1,
+    "base2_before": 0,
+    "base3_before": 0,
+    "scoring_position_before": 0,
+    "late_clutch": 1,
+    "is_home_batting": 1
+  },
+  "actual": {
+    "pitcher_pre_era_before": 4.50,
+    "pitcher_pre_whip_before": 1.35,
+    "pitcher_pre_k9_before": 7.2,
+    "pitcher_pre_bb9_before": 3.1,
+    "same_hand_matchup": 0,
+    "batter_platoon_advantage": 1,
+    "batter_pre_avg_before": 0.275,
+    "batter_pre_obp_approx_before": 0.345,
+    "batter_pre_slg_before": 0.420,
+    "batter_pre_ops_before": 0.765
+  },
+  "candidates": [
+    {
+      "label": "불펜 A (ERA 3.2)",
+      "pitcher_pre_era_before": 3.20,
+      "pitcher_pre_whip_before": 1.10,
+      "pitcher_pre_k9_before": 9.5,
+      "pitcher_pre_bb9_before": 2.4,
+      "same_hand_matchup": 1,
+      "batter_platoon_advantage": 0,
+      "batter_pre_avg_before": 0.275,
+      "batter_pre_obp_approx_before": 0.345,
+      "batter_pre_slg_before": 0.420,
+      "batter_pre_ops_before": 0.765
+    },
+    {
+      "label": "불펜 B (ERA 3.8)",
+      "pitcher_pre_era_before": 3.80,
+      "pitcher_pre_whip_before": 1.20,
+      "pitcher_pre_k9_before": 8.1,
+      "pitcher_pre_bb9_before": 2.9,
+      "same_hand_matchup": 0,
+      "batter_platoon_advantage": 1,
+      "batter_pre_avg_before": 0.275,
+      "batter_pre_obp_approx_before": 0.345,
+      "batter_pre_slg_before": 0.420,
+      "batter_pre_ops_before": 0.765
+    },
+    {
+      "label": "불펜 C (ERA 5.1)",
+      "pitcher_pre_era_before": 5.10,
+      "pitcher_pre_whip_before": 1.50,
+      "pitcher_pre_k9_before": 6.0,
+      "pitcher_pre_bb9_before": 3.8,
+      "same_hand_matchup": 0,
+      "batter_platoon_advantage": 0,
+      "batter_pre_avg_before": 0.275,
+      "batter_pre_obp_approx_before": 0.345,
+      "batter_pre_slg_before": 0.420,
+      "batter_pre_ops_before": 0.765
+    }
+  ]
+}

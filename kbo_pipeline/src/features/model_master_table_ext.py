@@ -72,7 +72,6 @@ def _join_recency(master: pd.DataFrame) -> pd.DataFrame:
     if not batter_rec.empty:
         batter_rec["batter_pcode_norm"] = batter_rec["player_code"].astype(str)
         batter_rec["batting_team_code"] = batter_rec["team_code"].astype(str)
-        # 기존 피처 컬럼과 충돌 방지: 모든 통계 컬럼에 접두사 추가
         stat_cols = [c for c in batter_rec.columns
                      if c not in ("game_id", "player_code", "team_code",
                                   "batter_pcode_norm", "batting_team_code",
@@ -81,6 +80,8 @@ def _join_recency(master: pd.DataFrame) -> pd.DataFrame:
         batter_rec = batter_rec.rename(columns=rename)
         keys = ["game_id", "batter_pcode_norm", "batting_team_code"]
         batter_rec = batter_rec.drop(columns=["player_code", "team_code"], errors="ignore")
+        out["batter_pcode_norm"] = out["batter_pcode_norm"].astype(str)
+        out["batting_team_code"] = out["batting_team_code"].astype(str)
         out = out.merge(batter_rec, on=keys, how="left")
         logger.info("타자 recency 조인: %d컬럼 추가", len(rename))
 
@@ -95,6 +96,8 @@ def _join_recency(master: pd.DataFrame) -> pd.DataFrame:
         pitcher_rec = pitcher_rec.rename(columns=rename)
         pitcher_rec = pitcher_rec.drop(columns=["pcode", "team_code"], errors="ignore")
         keys = ["game_id", "pitcher_pcode_norm", "fielding_team_code"]
+        out["pitcher_pcode_norm"] = out["pitcher_pcode_norm"].astype(str)
+        out["fielding_team_code"] = out["fielding_team_code"].astype(str)
         out = out.merge(pitcher_rec, on=keys, how="left")
         logger.info("투수 recency 조인: %d컬럼 추가", len(rename))
 
@@ -115,6 +118,7 @@ def _join_splits(master: pd.DataFrame) -> pd.DataFrame:
         spl_cols = [c for c in batter_spl.columns if c not in ("game_id", "batter_pcode", "batter_pcode_norm")]
         rename = {c: f"batter_{c}" for c in spl_cols}
         batter_spl = batter_spl.rename(columns=rename)
+        out["batter_pcode_norm"] = out["batter_pcode_norm"].astype(str)
         out = out.merge(
             batter_spl.drop(columns=["batter_pcode"], errors="ignore"),
             on=["game_id", "batter_pcode_norm"],
@@ -127,6 +131,7 @@ def _join_splits(master: pd.DataFrame) -> pd.DataFrame:
         spl_cols = [c for c in pitcher_spl.columns if c not in ("game_id", "pitcher_pcode", "pitcher_pcode_norm")]
         rename = {c: f"pitcher_{c}" for c in spl_cols}
         pitcher_spl = pitcher_spl.rename(columns=rename)
+        out["pitcher_pcode_norm"] = out["pitcher_pcode_norm"].astype(str)
         out = out.merge(
             pitcher_spl.drop(columns=["pitcher_pcode"], errors="ignore"),
             on=["game_id", "pitcher_pcode_norm"],
@@ -146,7 +151,9 @@ def _join_pitcher_context(master: pd.DataFrame) -> pd.DataFrame:
         return master
     ctx["pitcher_pcode_norm"] = ctx["pcode"].astype(str)
     ctx = ctx.drop(columns=["pcode"], errors="ignore")
-    out = master.merge(ctx, on=["game_id", "pitcher_pcode_norm"], how="left")
+    out = master.copy()
+    out["pitcher_pcode_norm"] = out["pitcher_pcode_norm"].astype(str)
+    out = out.merge(ctx, on=["game_id", "pitcher_pcode_norm"], how="left")
     logger.info("투수 컨텍스트 조인 완료")
     return out
 
@@ -180,7 +187,7 @@ def _add_home_advantage_feature(master: pd.DataFrame) -> pd.DataFrame:
             out["is_home_batting"] = out["batting_team_code"].eq(out["home_team_code"])
         else:
             out["is_home_batting"] = False
-    out["is_home_batting"] = out["is_home_batting"].astype(int)
+    out["is_home_batting"] = out["is_home_batting"].fillna(False).astype(bool).astype(int)
     return out
 
 
@@ -220,7 +227,15 @@ def run_extended_master_table(
     out_path = Path(output_path) if output_path else config.PROCESSED_DIR / "model_master_pa_extended.csv"
     elig_path = Path(eligible_output_path) if eligible_output_path else config.PROCESSED_DIR / "model_master_pa_extended_eligible.csv"
 
-    master   = build_model_master_table()
+    # 이미 정상적으로 생성된 model_master_pa.csv가 있으면 재사용 (plate_appearances.csv 재파싱 생략)
+    base_path = config.PROCESSED_DIR / "model_master_pa.csv"
+    if base_path.exists():
+        logger.info("기존 model_master_pa.csv 로드: %s", base_path)
+        import pandas as pd
+        master = pd.read_csv(base_path, low_memory=False, encoding="utf-8-sig")
+        logger.info("로드 완료: %d행 x %d열", len(master), len(master.columns))
+    else:
+        master = build_model_master_table()
     extended = build_extended_master_table(master)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

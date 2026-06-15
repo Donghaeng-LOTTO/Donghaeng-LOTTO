@@ -1,0 +1,136 @@
+{
+  "logistic_metrics": {
+    "model": "Logistic/SGD",
+    "n_samples": 158009,
+    "n_binary": 158009,
+    "mean_pred": 0.4876,
+    "mean_actual": 0.5066,
+    "auc": 0.8501,
+    "brier": 0.1583,
+    "log_loss": 0.4719,
+    "calibration_by_decile": [
+      {
+        "mean_pred": 0.0389,
+        "mean_actual": 0.0174,
+        "n": 15806
+      },
+      {
+        "mean_pred": 0.1092,
+        "mean_actual": 0.1095,
+        "n": 15796
+      },
+      {
+        "mean_pred": 0.2156,
+        "mean_actual": 0.2606,
+        "n": 15801
+      },
+      {
+        "mean_pred": 0.334,
+        "mean_actual": 0.4177,
+        "n": 15801
+      },
+      {
+        "mean_pred": 0.4235,
+        "mean_actual": 0.4717,
+        "n": 15804
+      },
+      {
+        "mean_pred": 0.5163,
+        "mean_actual": 0.5369,
+        "n": 15797
+      },
+      {
+        "mean_pred": 0.6339,
+        "mean_actual": 0.6133,
+        "n": 15801
+      },
+      {
+        "mean_pred": 0.7693,
+        "mean_actual": 0.7556,
+        "n": 15807
+      },
+      {
+        "mean_pred": 0.8793,
+        "mean_actual": 0.9027,
+        "n": 15795
+      },
+      {
+        "mean_pred": 0.956,
+        "mean_actual": 0.9807,
+        "n": 15801
+      }
+    ]
+  },
+  "lgbm_metrics": {
+    "model": "LightGBM",
+    "n_samples": 158009,
+    "n_binary": 153853,
+    "mean_pred": 0.5299,
+    "mean_actual": 0.5197,
+    "auc": 0.8615,
+    "brier": 0.1732,
+    "log_loss": 0.5293,
+    "calibration_by_decile": [
+      {
+        "mean_pred": 0.2553,
+        "mean_actual": 0.009600000455975533,
+        "n": 15386
+      },
+      {
+        "mean_pred": 0.3165,
+        "mean_actual": 0.10199999809265137,
+        "n": 15386
+      },
+      {
+        "mean_pred": 0.3972,
+        "mean_actual": 0.27219998836517334,
+        "n": 15384
+      },
+      {
+        "mean_pred": 0.47,
+        "mean_actual": 0.42809998989105225,
+        "n": 15385
+      },
+      {
+        "mean_pred": 0.5191,
+        "mean_actual": 0.47859999537467957,
+        "n": 15386
+      },
+      {
+        "mean_pred": 0.5561,
+        "mean_actual": 0.560699999332428,
+        "n": 15385
+      },
+      {
+        "mean_pred": 0.6069,
+        "mean_actual": 0.6597999930381775,
+        "n": 15392
+      },
+      {
+        "mean_pred": 0.6698,
+        "mean_actual": 0.7735999822616577,
+        "n": 15396
+      },
+      {
+        "mean_pred": 0.7315,
+        "mean_actual": 0.9251999855041504,
+        "n": 15370
+      },
+      {
+        "mean_pred": 0.7752,
+        "mean_actual": 0.9930999875068665,
+        "n": 15383
+      }
+    ]
+  },
+  "feature_mode": "mvp",
+  "label_col": "batting_team_win_label",
+  "n_features": 31,
+  "n_train": 529945,
+  "n_test": 158009,
+  "note": {
+    "lgbm_preprocessing": "없음 — 트리는 스케일 무관, NaN 자동 처리",
+    "logistic_preprocessing": "StandardScaler + SimpleImputer + saga solver",
+    "memory_optimization": "float32 변환으로 float64 대비 50% 절약"
+  }
+}

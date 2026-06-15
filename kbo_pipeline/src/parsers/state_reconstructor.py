@@ -202,9 +202,10 @@ def reconstruct_states_for_game(
 
         merged = pa_df.merge(starts, on="relay_no", how="left", suffixes=("", "_cgs"))
         pa_df["outs_before"] = pd.to_numeric(merged["out"], errors="coerce")
-        pa_df["base1_before"] = pd.to_numeric(merged["base1"], errors="coerce").fillna(0).astype(int)
-        pa_df["base2_before"] = pd.to_numeric(merged["base2"], errors="coerce").fillna(0).astype(int)
-        pa_df["base3_before"] = pd.to_numeric(merged["base3"], errors="coerce").fillna(0).astype(int)
+        # base1/2/3 는 JSON에서 선수코드(non-zero=주자있음)로 오므로 clip(0,1)로 이진화
+        pa_df["base1_before"] = pd.to_numeric(merged["base1"], errors="coerce").fillna(0).clip(0, 1).astype(int)
+        pa_df["base2_before"] = pd.to_numeric(merged["base2"], errors="coerce").fillna(0).clip(0, 1).astype(int)
+        pa_df["base3_before"] = pd.to_numeric(merged["base3"], errors="coerce").fillna(0).clip(0, 1).astype(int)
         pa_df["away_score_before"] = pd.to_numeric(merged["away_score"], errors="coerce")
         pa_df["home_score_before"] = pd.to_numeric(merged["home_score"], errors="coerce")
         # pa_df["outs_before"] = merged["out"]
@@ -213,6 +214,18 @@ def reconstruct_states_for_game(
         # pa_df["base3_before"] = merged["base3"].fillna(0).astype(int)
         # pa_df["away_score_before"] = merged["away_score"]
         # pa_df["home_score_before"] = merged["home_score"]
+        # away_score_after / home_score_after: PA 마지막 이벤트 점수를 사용
+        # text_reconstruction 경로와 컬럼 순서를 맞추기 위해 state_source 설정 전에 추가
+        # (mode="a" CSV append는 컬럼 순서 기반으로 저장됨)
+        ends = (
+            events_df
+            .sort_values("seqno")
+            .drop_duplicates(subset=["relay_no"], keep="last")
+            [["relay_no", "away_score", "home_score"]]
+        )
+        merged_end = pa_df[["relay_no"]].merge(ends, on="relay_no", how="left")
+        pa_df["away_score_after"] = pd.to_numeric(merged_end["away_score"].values, errors="coerce")
+        pa_df["home_score_after"] = pd.to_numeric(merged_end["home_score"].values, errors="coerce")
         pa_df["state_source"] = "currentGameState"
         pa_df["state_parse_status"] = "ok"
         pa_df["parse_warning"] = None
