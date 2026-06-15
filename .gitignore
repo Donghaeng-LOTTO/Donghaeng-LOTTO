@@ -121,3 +121,5 @@ Thumbs.db
 
 **/*.pdf
 **/*.m4a
+
+**/analysis/*.png
