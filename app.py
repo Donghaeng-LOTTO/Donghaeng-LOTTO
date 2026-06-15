@@ -15,8 +15,33 @@ st.set_page_config(
     page_title="LOTTE GIANTS INSIGHT PLATFORM",
     page_icon="⚾",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded"
 )
+
+st.markdown(
+    """
+    <style>
+        /* 탭의 버튼 텍스트 색상 및 스타일 */
+        [data-baseweb="tab"] {
+            font-size: 18px !important;
+            font-weight: 600 !important;
+            color: #333333 !important; /* 탭 글씨 색상 (어두운 회색) */
+        }
+        
+        /* 선택된 탭의 강조 색상 */
+        [data-baseweb="tab-highlight"] {
+            background-color: #E31937 !important; /* 롯데 레드 */
+        }
+        
+        /* 탭에 마우스를 올렸을 때 */
+        [data-baseweb="tab"]:hover {
+            color: #E31937 !important;
+        }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 
 # 로딩 스크린 프로세스 (최초 1회 실행)
 if "loaded" not in st.session_state:
@@ -248,6 +273,7 @@ selected_menu = option_menu(
         "database",
         "bar-chart-line",
         "cpu",
+        "person-badge",
         "diagram-3",
         "layer-backward",
     ],
@@ -358,14 +384,33 @@ with hero_col1:
         unsafe_allow_html=True,
     )
 
-    if st.button("EXPLORE PLATFORM", key="hero_cta_btn"):
+    col_a, col_b = st.columns(2)
+
+with col_a:
+    if st.button(
+        "🚀 시연 시작",
+        use_container_width=True
+    ):
+        st.switch_page(
+            "pages/01_Model_Analysis.py"
+        )
+
+with col_b:
+    if st.button(
+        "📖 프로젝트 소개",
+        use_container_width=True
+    ):
         st.markdown(
             """
             <script>
-                parent.document.getElementById("project-overview").scrollIntoView({ behavior: 'smooth', block: 'start' });
+            parent.document.getElementById(
+            "project-overview"
+            ).scrollIntoView(
+            {behavior:'smooth'}
+            );
             </script>
             """,
-            unsafe_allow_html=True,
+            unsafe_allow_html=True
         )
 
 # GLB 3D 파일 바이너리 변환 및 예외 처리
@@ -898,43 +943,61 @@ def create_metric_gauge(title, value):
             mode="gauge+number",
             value=value,
             domain={"x": [0, 1], "y": [0, 1]},
-            title={
-                "text": title,
-                "font": {"size": 18, "color": "#111827", "family": "Inter"},
-            },
+            title={"text": title, "font": {"size": 16}},
             gauge={
-                "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#6B7280"},
-                "bar": {"color": "#E31937", "thickness": 0.25},
-                "bgcolor": "#E5E7EB",
-                "borderwidth": 0,
-                "steps": [
-                    {"range": [0, 70], "color": "rgba(0,0,0,0.02)"},
-                    {"range": [70, 90], "color": "rgba(0,0,0,0.04)"},
-                    {"range": [90, 100], "color": "rgba(0,0,0,0.06)"},
-                ],
+                "axis": {"range": [0, 100]},
+                "bar": {"color": "#E31937"},
+                "bgcolor": "white",
             },
         )
     )
-    fig.update_layout(
-        margin=dict(l=20, r=20, t=50, b=20),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        height=250,
-    )
+    fig.update_layout(height=200, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
 
-# 생성 완료된 평가지표 레이아웃 다중 바인딩 연동 및 width="stretch" 설정
+# 게이지 표시
 with gauge_col1:
-    st.plotly_chart(create_metric_gauge("Accuracy", 85.4), width="stretch")
-
+    st.plotly_chart(create_metric_gauge("Accuracy", 88), use_container_width=True)
 with gauge_col2:
-    st.plotly_chart(create_metric_gauge("Precision", 83.2), width="stretch")
-
+    st.plotly_chart(create_metric_gauge("Precision", 92), use_container_width=True)
 with gauge_col3:
-    st.plotly_chart(create_metric_gauge("Recall", 81.7), width="stretch")
-
+    st.plotly_chart(create_metric_gauge("Recall", 85), use_container_width=True)
 with gauge_col4:
-    st.plotly_chart(create_metric_gauge("F1-Score", 82.4), width="stretch")
+    st.plotly_chart(create_metric_gauge("F1-Score", 89), use_container_width=True)
 
-st.markdown("---")
+# 페이지 하단 시연 페이지 이동 버튼 (발표 흐름의 끝)
+st.divider()
+st.markdown("<div style='text-align: center; padding: 20px;'>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style="
+        text-align:center;
+        padding:60px 20px;
+        background:#FFFFFF;
+        border-radius:24px;
+        border:1px solid #E5E7EB;
+        margin-top:50px;
+        margin-bottom:50px;
+    ">
+        <h2 style="color:#111827;">
+            준비되셨나요?
+        </h2>
+
+        <p style="
+            color:#6B7280;
+            font-size:18px;
+            margin-bottom:30px;
+        ">
+            실제 롯데 자이언츠 선수 데이터 분석 페이지로 이동하여<br>
+            시즌별 기록 및 다양한 통계 지표를 확인해보세요.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+col1, col2, col3 = st.columns([1, 2, 1])
+
+with col2:
+    if st.button("🚀 시연 페이지 시작하기", use_container_width=True, type="primary"):
+        st.switch_page("pages/01_Model_Analysis.py")
