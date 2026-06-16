@@ -384,19 +384,16 @@ selected_menu = option_menu(
     },
 )
 
-# 탭 선택 시 스크롤 이벤트 스크립트 주입
-st.markdown(
-    f"""
-    <script>
-        const targetSection = "{selected_menu}".toLowerCase().replace(/ /g, "-");
-        const element = parent.document.getElementById(targetSection);
-        if (element) {{
-            element.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-        }}
-    </script>
-    """,
-    unsafe_allow_html=True,
-)
+# 탭 선택 시 스크롤 — components.html(iframe)에서 parent.document 접근으로 실제 실행
+_target_id = selected_menu.lower().replace(" ", "-")
+components.html(f"""
+<script>
+    var el = window.parent.document.getElementById("{_target_id}");
+    if (el) {{
+        el.scrollIntoView({{behavior:"smooth", block:"start"}});
+    }}
+</script>
+""", height=0)
 
 
 # 섹션 위치 지정을 위한 고유 앵커 생성용 헬퍼 함수
@@ -1017,6 +1014,156 @@ st.markdown(f"""
   <div><span style="color:#6B7280;font-size:0.85rem">검증 타석</span><br><b>{_m['n_test']:,}개</b></div>
   <div><span style="color:#6B7280;font-size:0.85rem">피처 수</span><br><b>{_m['n_features']}개</b></div>
   <div><span style="color:#6B7280;font-size:0.85rem">라벨</span><br><b>타석팀 최종 승리</b></div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
+create_section_anchor("ROADMAP")
+
+st.markdown("""
+<div class='section-wrapper'>
+  <div class='section-title'>ROADMAP</div>
+  <div class='section-subtitle'>플랫폼 고도화 단계별 개발 로드맵 — 현재 완료된 기능과 향후 계획을 한눈에 확인합니다.</div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+.roadmap-item{display:flex;gap:20px;margin-bottom:24px;align-items:flex-start;}
+.roadmap-dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;margin-top:4px;}
+.dot-done{background:#E31937;color:white;}
+.dot-wip{background:#F59E0B;color:white;}
+.dot-plan{background:#E5E7EB;color:#9CA3AF;}
+.roadmap-body{flex:1;}
+.roadmap-title{font-size:1rem;font-weight:700;color:#111827;margin-bottom:4px;}
+.roadmap-desc{font-size:.875rem;color:#6B7280;line-height:1.5;}
+.roadmap-tag{display:inline-block;font-size:.75rem;font-weight:600;border-radius:20px;padding:2px 10px;margin-top:6px;}
+.tag-done{background:rgba(227,25,55,.1);color:#E31937;}
+.tag-wip{background:rgba(245,158,11,.1);color:#B45309;}
+.tag-plan{background:#F3F4F6;color:#6B7280;}
+</style>
+<div style="background:white;border-radius:20px;border:1px solid #E5E7EB;padding:36px 40px;">
+
+  <div class="roadmap-item">
+    <div class="roadmap-dot dot-done">✓</div>
+    <div class="roadmap-body">
+      <div class="roadmap-title">Phase 1 — 데이터 파이프라인 구축</div>
+      <div class="roadmap-desc">2008~2025 KBO 전 경기 데이터 수집·전처리, WE/RE 테이블 생성, 649,419 타석 모델 피처 엔지니어링 완료</div>
+      <span class="roadmap-tag tag-done">✅ 완료</span>
+    </div>
+  </div>
+
+  <div class="roadmap-item">
+    <div class="roadmap-dot dot-done">✓</div>
+    <div class="roadmap-body">
+      <div class="roadmap-title">Phase 2 — LightGBM 승리확률 모델</div>
+      <div class="roadmap-desc">31개 피처 기반 타석 단위 WP 모델, AUC 86.2%, Brier Score 보정, WhatIfEngine 구현</div>
+      <span class="roadmap-tag tag-done">✅ 완료</span>
+    </div>
+  </div>
+
+  <div class="roadmap-item">
+    <div class="roadmap-dot dot-done">✓</div>
+    <div class="roadmap-body">
+      <div class="roadmap-title">Phase 3 — 분석 플랫폼 1.0 런칭</div>
+      <div class="roadmap-desc">What-If 시뮬레이션, 선수 개인 분석, 시즌 대시보드, 경기 전 예측, 투수 교체 타이밍 — 5개 분석 페이지 완성</div>
+      <span class="roadmap-tag tag-done">✅ 완료</span>
+    </div>
+  </div>
+
+  <div class="roadmap-item">
+    <div class="roadmap-dot dot-wip">→</div>
+    <div class="roadmap-body">
+      <div class="roadmap-title">Phase 4 — 실시간 경기 연동</div>
+      <div class="roadmap-desc">라이브 스코어 API 연결, 경기 진행 중 WP 실시간 업데이트, 인게임 알림 시스템 구축</div>
+      <span class="roadmap-tag tag-wip">🔄 개발 중</span>
+    </div>
+  </div>
+
+  <div class="roadmap-item">
+    <div class="roadmap-dot dot-plan">○</div>
+    <div class="roadmap-body">
+      <div class="roadmap-title">Phase 5 — 딥러닝 고도화</div>
+      <div class="roadmap-desc">Transformer 기반 시퀀스 모델로 타석 흐름 학습, 투구 구질 데이터 통합, 타구 속도·발사각 피처 추가</div>
+      <span class="roadmap-tag tag-plan">📋 예정</span>
+    </div>
+  </div>
+
+  <div class="roadmap-item">
+    <div class="roadmap-dot dot-plan">○</div>
+    <div class="roadmap-body">
+      <div class="roadmap-title">Phase 6 — 구단 의사결정 지원 시스템</div>
+      <div class="roadmap-desc">코칭스태프용 태블릿 앱, 선수 컨디션 모니터링, 상대팀 스카우팅 리포트 자동 생성</div>
+      <span class="roadmap-tag tag-plan">📋 예정</span>
+    </div>
+  </div>
+
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
+create_section_anchor("TECH STACK")
+
+st.markdown("""
+<div class='section-wrapper'>
+  <div class='section-title'>TECH STACK</div>
+  <div class='section-subtitle'>플랫폼 전반에 걸쳐 사용된 기술 스택 — 데이터 수집부터 모델 서빙까지의 전체 아키텍처입니다.</div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+.tech-section{margin-bottom:28px;}
+.tech-section-title{font-size:.8rem;font-weight:700;color:#9CA3AF;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
+.tech-grid{display:flex;flex-wrap:wrap;gap:10px;}
+.tech-chip{background:white;border:1px solid #E5E7EB;border-radius:50px;padding:8px 18px;font-size:.875rem;font-weight:600;color:#111827;display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+.tech-chip:hover{border-color:#E31937;color:#E31937;transform:translateY(-2px);box-shadow:0 4px 12px rgba(227,25,55,.15);}
+</style>
+
+<div style="background:white;border-radius:20px;border:1px solid #E5E7EB;padding:36px 40px;">
+
+  <div class="tech-section">
+    <div class="tech-section-title">📊 Data & ML</div>
+    <div class="tech-grid">
+      <span class="tech-chip">🐍 Python 3.11</span>
+      <span class="tech-chip">🐼 Pandas</span>
+      <span class="tech-chip">🔢 NumPy</span>
+      <span class="tech-chip">⚡ LightGBM</span>
+      <span class="tech-chip">🤖 scikit-learn</span>
+      <span class="tech-chip">📈 Plotly</span>
+    </div>
+  </div>
+
+  <div class="tech-section">
+    <div class="tech-section-title">🌐 Frontend & App</div>
+    <div class="tech-grid">
+      <span class="tech-chip">🎈 Streamlit</span>
+      <span class="tech-chip">🎨 streamlit-option-menu</span>
+      <span class="tech-chip">🗔 streamlit-modal</span>
+      <span class="tech-chip">🧊 Three.js (GLB 3D)</span>
+    </div>
+  </div>
+
+  <div class="tech-section">
+    <div class="tech-section-title">🗄️ Data Sources</div>
+    <div class="tech-grid">
+      <span class="tech-chip">⚾ KBO 공식 기록</span>
+      <span class="tech-chip">📋 게임·타석·투수 CSV</span>
+      <span class="tech-chip">📊 WE / RE 테이블</span>
+      <span class="tech-chip">🏟️ 2008~2025 (18시즌)</span>
+    </div>
+  </div>
+
+  <div class="tech-section">
+    <div class="tech-section-title">🏗️ Architecture</div>
+    <div class="tech-grid">
+      <span class="tech-chip">🔧 WhatIfEngine</span>
+      <span class="tech-chip">💾 @st.cache_data</span>
+      <span class="tech-chip">🗂️ Multi-page App</span>
+      <span class="tech-chip">📦 Pickle Model</span>
+    </div>
+  </div>
+
 </div>
 """, unsafe_allow_html=True)
 
