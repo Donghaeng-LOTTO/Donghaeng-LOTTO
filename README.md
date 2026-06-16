@@ -92,6 +92,8 @@ uv run streamlit run app.py
 
 ---
 
-## 팀
+## ⚾ 선발 라인업 (Team)
 
-Base1 전해성(FlatBass FlatBass) : (데이터수집) · Base2 백락원(raks030517-netizen) : (모델학습) · Base3 정혁(HyeokJung803) : (streamlit 구현, github 관리)
+* **Base1 전해성** : KBO 경기 데이터 수집 및 전처리 파이프라인 구축
+* **Base2 백락원** : LightGBM 기반 승리확률(WP) 예측 모델 학습 및 최적화
+* **Base3 정혁** : Streamlit 대시보드 UI/UX 구현 및 GitHub 버전 관리
