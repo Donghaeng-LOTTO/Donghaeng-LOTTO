@@ -94,4 +94,4 @@ uv run streamlit run app.py
 
 ## 팀
 
-Base1 전해성(FlatBass FlatBass) : (데이터수집) · Base2 백락원 (모델학습) · Base3 정혁 (streamlit 구현, github 관리)
+Base1 전해성(FlatBass FlatBass) : (데이터수집) · Base2 백락원(raks030517-netizen) : (모델학습) · Base3 정혁(HyeokJung803) : (streamlit 구현, github 관리)
