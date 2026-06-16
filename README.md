@@ -80,8 +80,8 @@ WP = P(공격팀 승리 | 이닝, 초/말, 점수차, 아웃카운트, 주자상
 ```bash
 git clone https://github.com/your-org/Donghaeng-LOTTO.git
 cd Donghaeng-LOTTO
-pip install -r requirements.txt
-streamlit run app.py
+uv sync
+uv run streamlit run app.py
 ```
 
 ---

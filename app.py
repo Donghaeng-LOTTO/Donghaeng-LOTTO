@@ -467,7 +467,7 @@ with col_a:
         use_container_width=True
     ):
         st.switch_page(
-            "pages/02_WhatIf_Analysis.py"
+            "pages/01_WhatIf_Analysis.py"
         )
 
 with col_b:
@@ -1174,4 +1174,4 @@ st.markdown("<div style='text-align:center;padding:60px 20px;background:#FFFFFF;
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     if st.button("🚀 경기 IF 분석 시작하기", use_container_width=True, type="primary"):
-        st.switch_page("pages/02_WhatIf_Analysis.py")
+        st.switch_page("pages/01_WhatIf_Analysis.py")
