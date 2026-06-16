@@ -1,7 +1,0 @@
-streamlit
-lightgbm
-pandas
-numpy
-plotly
-streamlit-option-menu
-streamlit-modal
