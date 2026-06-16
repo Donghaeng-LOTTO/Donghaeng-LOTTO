@@ -65,6 +65,10 @@ WP = P(공격팀 승리 | 이닝, 초/말, 점수차, 아웃카운트, 주자상
 
 ## 데이터
 
+용량 문제로 Git에 포함되지 않습니다. 아래 링크에서 다운로드 후 `kbo_pipeline/data/processed/` 와 `kbo_pipeline/models/` 에 넣어주세요.
+
+[📂 Google Drive 다운로드](https://drive.google.com/drive/folders/12K5kc11sHDGpPQnlAwnFbOqqzaqMZDCA)
+
 - **기간**: 2008~2025 (18시즌)
 - **타석**: 649,419개 (`model_master_pa_eligible.csv`)
 - **소스 테이블**: 19개 (games, batter/pitcher stats, WE table, RE table 등)
